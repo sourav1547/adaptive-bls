@@ -249,13 +249,15 @@ func (b *BLS) cpProve(pk bls.G1Jac, roMsg bls.G2Jac, sigma bls.G2Jac, sec fr.Ele
 func (b *BLS) cpVerify(pk bls.G1Jac, roMsg bls.G2Jac, sigma bls.G2Jac, pf Pf) bool {
 	zInt := pf.z.BigInt(&big.Int{})
 	cInt := pf.c.BigInt(&big.Int{})
-	gZ := *new(bls.G1Jac).ScalarMultiplication(&b.crs.g1, zInt)
-	xC := *new(bls.G1Jac).ScalarMultiplication(&pk, cInt)
-	hZ := *new(bls.G2Jac).ScalarMultiplication(&roMsg, zInt)
-	yC := *new(bls.G2Jac).ScalarMultiplication(&sigma, cInt)
 
-	gZ = *gZ.SubAssign(&xC)
-	hZ = *hZ.SubAssign(&yC)
+	pkC := *new(bls.G1Jac).ScalarMultiplication(&pk, cInt)
+	sigmaC := *new(bls.G2Jac).ScalarMultiplication(&sigma, cInt)
+
+	gZ := *new(bls.G1Jac).ScalarMultiplication(&b.crs.g1, zInt)
+	hZ := *new(bls.G2Jac).ScalarMultiplication(&roMsg, zInt)
+
+	gZ = *gZ.SubAssign(&pkC)
+	hZ = *hZ.SubAssign(&sigmaC)
 
 	cLocal := getFSChal([]bls.G1Jac{pk, gZ}, []bls.G2Jac{roMsg, hZ})
 

@@ -45,3 +45,32 @@ func TestABLS(t *testing.T) {
 	msig := m.verifyCombine(ro0Msg, ro1Msg, signers, sigmas, pfs)
 	assert.Equal(t, m.gverify(ro0Msg, msig), true, "Adaptive BLS Threshold Signature")
 }
+
+func BenchmarkABLS(b *testing.B) {
+	msg := []byte("hello world")
+
+	dst0 := []byte("DST0")
+	dst1 := []byte("DST1")
+
+	ro0Msg, _ := bls.HashToG2(msg, dst0)
+	ro1Msg, _ := bls.HashToG2(msg, dst1)
+
+	n := 1 << 5
+	ths := n / 2
+
+	crs := GenABLSCRS(n)
+	m := NewABLS(n, ths, crs)
+
+	var sigma bls.G2Jac
+	var pf SigmaPf
+	b.Run("ABLS pSign", func(b *testing.B) {
+		b.ResetTimer()
+		sigma, pf = m.pSign(msg, m.pp.signers[0])
+	})
+
+	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
+	b.Run("Boldyreva2 pVerify", func(b *testing.B) {
+		b.ResetTimer()
+		m.pVerify(ro0Msg, ro1Msg, sigma, pk0Aff, pf)
+	})
+}

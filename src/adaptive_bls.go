@@ -173,14 +173,9 @@ func (b *ABLS) sigmaProve(ro0Msg bls.G2Affine, ro1Msg bls.G2Affine, sigma bls.G2
 	c := getFSChal([]bls.G1Jac{signer.pKey, x}, []bls.G2Jac{sigma, y})
 
 	var zs, zr, zu fr.Element
-	zs.Mul(&c, &signer.sKey)
-	zs.Add(&zs, &hs)
-
-	zr.Mul(&c, &signer.rKey)
-	zr.Add(&zr, &hr)
-
-	zu.Mul(&c, &signer.uKey)
-	zu.Add(&zu, &hu)
+	zs.Add(zs.Mul(&c, &signer.sKey), &hs)
+	zr.Add(zr.Mul(&c, &signer.rKey), &hr)
+	zu.Add(zu.Mul(&c, &signer.uKey), &hu)
 
 	return SigmaPf{c, zs, zr, zu}
 }
