@@ -65,12 +65,61 @@ func BenchmarkABLS(b *testing.B) {
 	var pf SigmaPf
 	b.Run("ABLS pSign", func(b *testing.B) {
 		b.ResetTimer()
-		sigma, pf = m.pSign(msg, m.pp.signers[0])
+		for i := 0; i < b.N; i++ {
+			sigma, pf = m.pSign(msg, m.pp.signers[0])
+		}
 	})
 
 	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
-	b.Run("Boldyreva2 pVerify", func(b *testing.B) {
+	b.Run("ABLS pVerify", func(b *testing.B) {
 		b.ResetTimer()
-		m.pVerify(ro0Msg, ro1Msg, sigma, pk0Aff, pf)
+		for i := 0; i < b.N; i++ {
+			m.pVerify(ro0Msg, ro1Msg, sigma, pk0Aff, pf)
+		}
 	})
+}
+
+func BenchmarkAggABLS(b *testing.B) {
+	testCases := []struct {
+		name string
+		n, t int
+	}{
+		{"64", 64, 64},
+		{"256", 256, 256},
+		{"1024", 1024, 1024},
+	}
+
+	msg := []byte("hello world")
+	dst0 := []byte("DST0")
+	dst1 := []byte("DST1")
+
+	ro0Msg, _ := bls.HashToG2(msg, dst0)
+	ro1Msg, _ := bls.HashToG2(msg, dst1)
+
+	for _, tc := range testCases {
+		crs := GenABLSCRS(tc.n)
+		m := NewABLS(tc.n, tc.t-1, crs)
+
+		signers := make([]int, tc.t)
+		sigmas := make([]bls.G2Jac, tc.t)
+		pfs := make([]SigmaPf, tc.t)
+
+		for i := 0; i < b.N; i++ {
+			signers[i] = i
+			sigma, pf := m.pSign(msg, m.pp.signers[i])
+			pfs[i] = pf
+			sigmas[i] = sigma
+		}
+
+		b.Run(tc.name+"-ABLS-agg", func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// sigmasAff := make([]bls.G2Affine, len(signers))
+				// for ii, sigma := range sigmas {
+				// 	sigmasAff[ii].FromJacobian(&sigma)
+				// }
+				m.verifyCombine(ro0Msg, ro1Msg, signers, sigmas, pfs)
+			}
+		})
+	}
 }

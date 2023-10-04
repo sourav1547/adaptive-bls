@@ -73,36 +73,43 @@ func BenchmarkBoldyreva(b *testing.B) {
 	var sigma bls.G2Jac
 	b.Run("Boldyreva1 pSign", func(b *testing.B) {
 		b.ResetTimer()
-		sigma = m.psign(msg, m.pp.signers[0])
+		for i := 0; i < b.N; i++ {
+			sigma = m.psign(msg, m.pp.signers[0])
+		}
 	})
 
 	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
 	b.Run("Boldyreva1 pVerify", func(b *testing.B) {
 		b.ResetTimer()
-		m.pverify(roMsg, sigma, pk0Aff)
+		for i := 0; i < b.N; i++ {
+			m.pverify(roMsg, sigma, pk0Aff)
+		}
 	})
 
 	var pf Pf
 	b.Run("Boldyreva2 pSign", func(b *testing.B) {
 		b.ResetTimer()
-		sigma, pf = m.pSignDleq(msg, m.pp.signers[0])
+		for i := 0; i < b.N; i++ {
+			sigma, pf = m.pSignDleq(msg, m.pp.signers[0])
+		}
 	})
 
 	b.Run("Boldyreva2 pVerify", func(b *testing.B) {
 		b.ResetTimer()
-		m.pVerifyDleq(roMsg, sigma, pk0Aff, pf)
+		for i := 0; i < b.N; i++ {
+			m.pVerifyDleq(roMsg, sigma, pk0Aff, pf)
+		}
 	})
 }
 
-func BenchmarkBLSUW(b *testing.B) {
+func BenchmarkAggBoldyreva(b *testing.B) {
 	testCases := []struct {
 		name string
 		n, t int
 	}{
 		{"64", 64, 64},
-		// {"256", 256, 256},
-		// {"1024", 1024, 1024},
-		// {"4096", 4096, 4096},
+		{"256", 256, 256},
+		{"1024", 1024, 1024},
 	}
 
 	msg := []byte("hello world")
@@ -121,19 +128,37 @@ func BenchmarkBLSUW(b *testing.B) {
 		}
 
 		var sigma bls.G2Jac
-		b.ResetTimer()
-		b.Run(tc.name+"-agg", func(b *testing.B) {
+		b.Run(tc.name+"-B1-agg", func(b *testing.B) {
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				sigmasAff := make([]bls.G2Affine, len(signers))
-				for ii, sigma := range sigmas {
-					sigmasAff[ii].FromJacobian(&sigma)
-				}
-				sigma = m.combine(signers, sigmasAff)
+				// sigmasAff := make([]bls.G2Affine, len(signers))
+				// for ii, sigma := range sigmas {
+				// 	sigmasAff[ii].FromJacobian(&sigma)
+				// }
+				sigma = m.verifyCombine(roMsg, signers, sigmas)
 			}
 		})
 
-		b.ResetTimer()
+		pfs := make([]Pf, tc.t)
+		for i := 0; i < b.N; i++ {
+			signers[i] = i
+			sigma, pf := m.pSignDleq(msg, m.pp.signers[i])
+			pfs[i] = pf
+			sigmas[i] = sigma
+		}
+		b.Run(tc.name+"-B2-agg", func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// sigmasAff := make([]bls.G2Affine, len(signers))
+				// for ii, sigma := range sigmas {
+				// 	sigmasAff[ii].FromJacobian(&sigma)
+				// }
+				sigma = m.verifyCombineDleq(roMsg, signers, sigmas, pfs)
+			}
+		})
+
 		b.Run(tc.name+"-ver", func(b *testing.B) {
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				m.gverify(roMsg, sigma)
 			}
