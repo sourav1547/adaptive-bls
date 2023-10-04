@@ -10,14 +10,10 @@ import (
 
 func TestBLS(t *testing.T) {
 	msg := []byte("hello world")
-	roMsg, _ := bls.HashToG2(msg, []byte{})
+	roMsg, _ := bls.HashToG2(msg, []byte("DST"))
 
 	n := 1 << 5
 	ths := n / 2
-	weights := make([]int, n)
-	for i := 0; i < n; i++ {
-		weights[i] = i
-	}
 
 	crs := GenBLSCRS(n)
 	m := NewBLS(n, ths, crs)
@@ -36,15 +32,10 @@ func TestBLS(t *testing.T) {
 
 func TestBLSDleq(t *testing.T) {
 	msg := []byte("hello world")
-	roMsg, _ := bls.HashToG2(msg, []byte{})
-	roMsgJac := *new(bls.G2Jac).FromAffine(&roMsg)
+	roMsg, _ := bls.HashToG2(msg, []byte("DST"))
 
 	n := 1 << 5
 	ths := n / 2
-	weights := make([]int, n)
-	for i := 0; i < n; i++ {
-		weights[i] = i
-	}
 
 	crs := GenBLSCRS(n)
 	m := NewBLS(n, ths, crs)
@@ -59,7 +50,7 @@ func TestBLSDleq(t *testing.T) {
 		pfs = append(pfs, pf)
 
 		pkAff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
-		if m.pVerifyDleq(roMsgJac, sigma, pkAff, pf) {
+		if m.pVerifyDleq(roMsg, sigma, pkAff, pf) {
 			fmt.Println(i)
 		}
 	}
@@ -69,27 +60,55 @@ func TestBLSDleq(t *testing.T) {
 	assert.Equal(t, m.gverify(roMsg, msig), true, "BLS Threshold Signature")
 }
 
+func BenchmarkBoldyreva(b *testing.B) {
+	msg := []byte("hello world")
+	roMsg, _ := bls.HashToG2(msg, []byte("DST"))
+
+	n := 1 << 13
+	ths := n / 2
+
+	crs := GenBLSCRS(n)
+	m := NewBLS(n, ths, crs)
+
+	var sigma bls.G2Jac
+	b.Run("Boldyreva1 pSign", func(b *testing.B) {
+		b.ResetTimer()
+		sigma = m.psign(msg, m.pp.signers[0])
+	})
+
+	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
+	b.Run("Boldyreva1 pVerify", func(b *testing.B) {
+		b.ResetTimer()
+		m.pverify(roMsg, sigma, pk0Aff)
+	})
+
+	var pf Pf
+	b.Run("Boldyreva2 pSign", func(b *testing.B) {
+		b.ResetTimer()
+		sigma, pf = m.pSignDleq(msg, m.pp.signers[0])
+	})
+
+	b.Run("Boldyreva2 pVerify", func(b *testing.B) {
+		b.ResetTimer()
+		m.pVerifyDleq(roMsg, sigma, pk0Aff, pf)
+	})
+}
+
 func BenchmarkBLSUW(b *testing.B) {
 	testCases := []struct {
 		name string
 		n, t int
 	}{
 		{"64", 64, 64},
-		{"256", 256, 256},
-		{"1024", 1024, 1024},
-		{"4096", 4096, 4096},
+		// {"256", 256, 256},
+		// {"1024", 1024, 1024},
+		// {"4096", 4096, 4096},
 	}
 
 	msg := []byte("hello world")
 	roMsg, _ := bls.HashToG2(msg, []byte{})
 
 	for _, tc := range testCases {
-
-		weights := make([]int, tc.n)
-		for i := 0; i < tc.n; i++ {
-			weights[i] = 1
-		}
-
 		crs := GenBLSCRS(tc.n)
 		m := NewBLS(tc.n, tc.t-1, crs)
 
@@ -102,8 +121,8 @@ func BenchmarkBLSUW(b *testing.B) {
 		}
 
 		var sigma bls.G2Jac
+		b.ResetTimer()
 		b.Run(tc.name+"-agg", func(b *testing.B) {
-			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				sigmasAff := make([]bls.G2Affine, len(signers))
 				for ii, sigma := range sigmas {
@@ -113,8 +132,8 @@ func BenchmarkBLSUW(b *testing.B) {
 			}
 		})
 
+		b.ResetTimer()
 		b.Run(tc.name+"-ver", func(b *testing.B) {
-			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				m.gverify(roMsg, sigma)
 			}

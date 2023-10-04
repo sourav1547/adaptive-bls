@@ -137,141 +137,14 @@ func (b *BLS) keyGen() {
 
 // Takes the signing key and signs the message
 func (b *BLS) psign(msg Message, signer BLSParty) bls.G2Jac {
-	var (
-		dst   []byte
-		sigma bls.G2Jac
-		roMsg bls.G2Jac
-	)
-	roMsgAf, err := bls.HashToG2(msg, dst)
-	roMsg.FromAffine(&roMsgAf)
-
+	roMsgAf, err := bls.HashToG2(msg, []byte("DST"))
 	if err != nil {
 		fmt.Printf("Signature error!")
 	}
 
-	sigma.ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))
-	return sigma
-}
+	roMsg := *new(bls.G2Jac).FromAffine(&roMsgAf)
 
-type Pf struct {
-	c fr.Element
-	z fr.Element
-}
-
-// func getFSChal(vals []bls.G1Affine, ths int) fr.Element {
-// 	n := len(vals)
-// 	hMsg := make([]byte, n*48+4)
-// 	for i, val := range vals {
-// 		mBytes := val.Bytes()
-// 		copy(hMsg[i*48:(i+1)*48], mBytes[:])
-// 	}
-// 	tBytes := make([]byte, 4)
-// 	binary.LittleEndian.PutUint32(tBytes, uint32(ths))
-// 	copy(hMsg[n*48:], tBytes)
-
-// }
-
-func getFSChal(val1 []bls.G1Jac, val2 []bls.G2Jac) fr.Element {
-	n1 := len(val1)
-	n2 := len(val2)
-	hMsg := make([]byte, n1*48+n2*96)
-
-	for i, v := range val1 {
-		valAff := *new(bls.G1Affine).FromJacobian(&v)
-		mBytes := valAff.Bytes()
-		copy(hMsg[i*48:(i+1)*48], mBytes[:])
-	}
-
-	shift := n1 * 48
-	for i, v := range val2 {
-		valAff := *new(bls.G2Affine).FromJacobian(&v)
-		mBytes := valAff.Bytes()
-		copy(hMsg[shift+i*48:shift+(i+1)*48], mBytes[:])
-	}
-
-	hFunc := sha256.New()
-	hFunc.Reset()
-	return *new(fr.Element).SetBytes(hFunc.Sum(hMsg))
-}
-
-// Computing the Chaum-Pedersen Sigma protocol
-func cpProve(g bls.G1Jac, x bls.G1Jac, h bls.G2Jac, y bls.G2Jac, sec fr.Element) Pf {
-	var r fr.Element
-	r.SetRandom()
-	rInt := r.BigInt(&big.Int{})
-	gr := *new(bls.G1Jac).ScalarMultiplication(&g, rInt)
-	hmr := *new(bls.G2Jac).ScalarMultiplication(&h, rInt)
-
-	c := getFSChal([]bls.G1Jac{x, gr}, []bls.G2Jac{y, hmr})
-
-	var z fr.Element
-	z.Mul(&c, &sec)
-	z.Add(&z, &r)
-
-	return Pf{c, z}
-}
-
-// Checks the correctness of the Chaum-Pedersen Proof
-func cpVerify(g bls.G1Jac, x bls.G1Jac, h bls.G2Jac, y bls.G2Jac, pf Pf) bool {
-	zInt := pf.z.BigInt(&big.Int{})
-	cInt := pf.c.BigInt(&big.Int{})
-	gZ := *new(bls.G1Jac).ScalarMultiplication(&g, zInt)
-	xC := *new(bls.G1Jac).ScalarMultiplication(&x, cInt)
-	hZ := *new(bls.G2Jac).ScalarMultiplication(&h, zInt)
-	yC := *new(bls.G2Jac).ScalarMultiplication(&y, cInt)
-
-	gZ = *gZ.SubAssign(&xC)
-	hZ = *hZ.SubAssign(&yC)
-
-	cLocal := getFSChal([]bls.G1Jac{x, gZ}, []bls.G2Jac{y, hZ})
-
-	return pf.c.Equal(&cLocal)
-}
-
-// Partial signature along
-func (b *BLS) pSignDleq(msg Message, signer BLSParty) (bls.G2Jac, Pf) {
-	var (
-		dst   []byte
-		sigma bls.G2Jac
-		roMsg bls.G2Jac
-	)
-	roMsgAf, err := bls.HashToG2(msg, dst)
-	roMsg.FromAffine(&roMsgAf)
-
-	if err != nil {
-		fmt.Printf("Signature error!")
-	}
-
-	sigma.ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))
-	pf := cpProve(b.crs.g1, signer.pKey, roMsg, sigma, signer.sKey)
-	return sigma, pf
-}
-
-func (b *BLS) pVerifyDleq(roMsg bls.G2Jac, sigma bls.G2Jac, vkAf bls.G1Affine, pf Pf) bool {
-	vk := *new(bls.G1Jac).FromAffine(&vkAf)
-	return cpVerify(b.crs.g1, vk, roMsg, sigma, pf)
-}
-
-func (b *BLS) verifyCombineDleq(msg bls.G2Affine, signers []int, sigmas []bls.G2Jac, pfs []Pf) bls.G2Jac {
-	var vfSigners []int
-	var lIdx []int
-	msgJac := *new(bls.G2Jac).FromAffine(&msg)
-	for i, idx := range signers {
-		if b.pVerifyDleq(msgJac, sigmas[i], b.pp.pKeys[idx], pfs[i]) {
-			vfSigners = append(vfSigners, signers[i])
-			lIdx = append(lIdx, i)
-			if len(lIdx) == b.t+1 {
-				break
-			}
-		}
-	}
-
-	vfSigs := make([]bls.G2Affine, len(vfSigners))
-	for i, idx := range lIdx {
-		vfSigs[i].FromJacobian(&sigmas[idx])
-	}
-
-	return b.combine(vfSigners, vfSigs)
+	return *new(bls.G2Jac).ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))
 }
 
 // Takes the msg, signature and signing key and verifies the signature
@@ -321,6 +194,110 @@ func (b *BLS) combine(signers []int, sigmas []bls.G2Affine) bls.G2Jac {
 	thSig.MultiExp(sigmas, lagH, ecc.MultiExpConfig{})
 
 	return thSig
+}
+
+/**************************
+	DLEQ BASED BLS
+***************************/
+
+type Pf struct {
+	c fr.Element
+	z fr.Element
+}
+
+func getFSChal(val1 []bls.G1Jac, val2 []bls.G2Jac) fr.Element {
+	n1 := len(val1)
+	n2 := len(val2)
+	hMsg := make([]byte, n1*48+n2*96)
+
+	for i, v := range val1 {
+		valAff := *new(bls.G1Affine).FromJacobian(&v)
+		mBytes := valAff.Bytes()
+		copy(hMsg[i*48:(i+1)*48], mBytes[:])
+	}
+
+	shift := n1 * 48
+	for i, v := range val2 {
+		valAff := *new(bls.G2Affine).FromJacobian(&v)
+		mBytes := valAff.Bytes()
+		copy(hMsg[shift+i*48:shift+(i+1)*48], mBytes[:])
+	}
+
+	hFunc := sha256.New()
+	hFunc.Reset()
+	return *new(fr.Element).SetBytes(hFunc.Sum(hMsg))
+}
+
+// Computing the Chaum-Pedersen Sigma protocol
+func (b *BLS) cpProve(pk bls.G1Jac, roMsg bls.G2Jac, sigma bls.G2Jac, sec fr.Element) Pf {
+	var r fr.Element
+	r.SetRandom()
+	rInt := r.BigInt(&big.Int{})
+	gr := *new(bls.G1Jac).ScalarMultiplication(&b.crs.g1, rInt)
+	hmr := *new(bls.G2Jac).ScalarMultiplication(&roMsg, rInt)
+
+	c := getFSChal([]bls.G1Jac{pk, gr}, []bls.G2Jac{roMsg, hmr})
+
+	var z fr.Element
+	z.Mul(&c, &sec)
+	z.Add(&z, &r)
+
+	return Pf{c, z}
+}
+
+// Checks the correctness of the Chaum-Pedersen Proof
+func (b *BLS) cpVerify(pk bls.G1Jac, roMsg bls.G2Jac, sigma bls.G2Jac, pf Pf) bool {
+	zInt := pf.z.BigInt(&big.Int{})
+	cInt := pf.c.BigInt(&big.Int{})
+	gZ := *new(bls.G1Jac).ScalarMultiplication(&b.crs.g1, zInt)
+	xC := *new(bls.G1Jac).ScalarMultiplication(&pk, cInt)
+	hZ := *new(bls.G2Jac).ScalarMultiplication(&roMsg, zInt)
+	yC := *new(bls.G2Jac).ScalarMultiplication(&sigma, cInt)
+
+	gZ = *gZ.SubAssign(&xC)
+	hZ = *hZ.SubAssign(&yC)
+
+	cLocal := getFSChal([]bls.G1Jac{pk, gZ}, []bls.G2Jac{roMsg, hZ})
+
+	return pf.c.Equal(&cLocal)
+}
+
+// Partial signature along
+func (b *BLS) pSignDleq(msg Message, signer BLSParty) (bls.G2Jac, Pf) {
+
+	roMsgAf, _ := bls.HashToG2(msg, []byte("DST"))
+	roMsg := *new(bls.G2Jac).FromAffine(&roMsgAf)
+	sigma := *new(bls.G2Jac).ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))
+
+	pf := b.cpProve(signer.pKey, roMsg, sigma, signer.sKey)
+	return sigma, pf
+}
+
+func (b *BLS) pVerifyDleq(roMsgAf bls.G2Affine, sigma bls.G2Jac, vkAf bls.G1Affine, pf Pf) bool {
+	vk := *new(bls.G1Jac).FromAffine(&vkAf)
+	roMsg := *new(bls.G2Jac).FromAffine(&roMsgAf)
+	return b.cpVerify(vk, roMsg, sigma, pf)
+}
+
+func (b *BLS) verifyCombineDleq(msg bls.G2Affine, signers []int, sigmas []bls.G2Jac, pfs []Pf) bls.G2Jac {
+	var vfSigners []int
+	var lIdx []int
+	for i, idx := range signers {
+		if b.pVerifyDleq(msg, sigmas[i], b.pp.pKeys[idx], pfs[i]) {
+			vfSigners = append(vfSigners, signers[i])
+			lIdx = append(lIdx, i)
+			if len(lIdx) == b.t+1 {
+				break
+			}
+		}
+	}
+
+	vfSigs := make([]bls.G2Affine, len(vfSigners))
+	for i, idx := range lIdx {
+		vfSigs[i].FromJacobian(&sigmas[idx])
+	}
+
+	return b.combine(vfSigners, vfSigs)
 }
 
 func (b *BLS) gverify(roMsg bls.G2Affine, sigma bls.G2Jac) bool {
