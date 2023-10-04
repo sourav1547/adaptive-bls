@@ -143,15 +143,12 @@ func (b *BLS) psign(msg Message, signer BLSParty) bls.G2Jac {
 	}
 
 	roMsg := *new(bls.G2Jac).FromAffine(&roMsgAf)
-
 	return *new(bls.G2Jac).ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))
 }
 
 // Takes the msg, signature and signing key and verifies the signature
 func (b *BLS) pverify(roMsg bls.G2Affine, sigma bls.G2Jac, vk bls.G1Affine) bool {
-	var sigmaAff bls.G2Affine
-	sigmaAff.FromJacobian(&sigma)
-
+	sigmaAff := *new(bls.G2Affine).FromJacobian(&sigma)
 	res, _ := bls.PairingCheck([]bls.G1Affine{vk, b.crs.g1InvAf}, []bls.G2Affine{roMsg, sigmaAff})
 	return res
 }
@@ -266,7 +263,6 @@ func (b *BLS) cpVerify(pk bls.G1Jac, roMsg bls.G2Jac, sigma bls.G2Jac, pf Pf) bo
 
 // Partial signature along
 func (b *BLS) pSignDleq(msg Message, signer BLSParty) (bls.G2Jac, Pf) {
-
 	roMsgAf, _ := bls.HashToG2(msg, []byte("DST"))
 	roMsg := *new(bls.G2Jac).FromAffine(&roMsgAf)
 	sigma := *new(bls.G2Jac).ScalarMultiplication(&roMsg, signer.sKey.BigInt(&big.Int{}))

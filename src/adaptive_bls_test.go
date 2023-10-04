@@ -79,7 +79,7 @@ func BenchmarkABLS(b *testing.B) {
 	})
 }
 
-func BenchmarkAggABLS(b *testing.B) {
+func BenchmarkABLSAgg(b *testing.B) {
 	testCases := []struct {
 		name string
 		n, t int
@@ -114,10 +114,6 @@ func BenchmarkAggABLS(b *testing.B) {
 		b.Run(tc.name+"-ABLS-agg", func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// sigmasAff := make([]bls.G2Affine, len(signers))
-				// for ii, sigma := range sigmas {
-				// 	sigmasAff[ii].FromJacobian(&sigma)
-				// }
 				m.verifyCombine(ro0Msg, ro1Msg, signers, sigmas, pfs)
 			}
 		})

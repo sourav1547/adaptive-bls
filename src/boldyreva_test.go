@@ -48,11 +48,6 @@ func TestBLSDleq(t *testing.T) {
 		sigma, pf := m.pSignDleq(msg, m.pp.signers[i])
 		sigmas = append(sigmas, sigma)
 		pfs = append(pfs, pf)
-
-		pkAff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
-		if m.pVerifyDleq(roMsg, sigma, pkAff, pf) {
-			fmt.Println(i)
-		}
 	}
 
 	msig := m.verifyCombineDleq(roMsg, signers, sigmas, pfs)
@@ -60,18 +55,18 @@ func TestBLSDleq(t *testing.T) {
 	assert.Equal(t, m.gverify(roMsg, msig), true, "BLS Threshold Signature")
 }
 
-func BenchmarkBoldyreva(b *testing.B) {
+func BenchmarkBLS(b *testing.B) {
 	msg := []byte("hello world")
 	roMsg, _ := bls.HashToG2(msg, []byte("DST"))
 
-	n := 1 << 13
-	ths := n / 2
+	n := 64
+	ths := n - 1
 
 	crs := GenBLSCRS(n)
 	m := NewBLS(n, ths, crs)
 
 	var sigma bls.G2Jac
-	b.Run("Boldyreva1 pSign", func(b *testing.B) {
+	b.Run("B1-pSign", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			sigma = m.psign(msg, m.pp.signers[0])
@@ -79,7 +74,7 @@ func BenchmarkBoldyreva(b *testing.B) {
 	})
 
 	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
-	b.Run("Boldyreva1 pVerify", func(b *testing.B) {
+	b.Run("B1-pVerify", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			m.pverify(roMsg, sigma, pk0Aff)
@@ -87,14 +82,14 @@ func BenchmarkBoldyreva(b *testing.B) {
 	})
 
 	var pf Pf
-	b.Run("Boldyreva2 pSign", func(b *testing.B) {
+	b.Run("B2-pSign", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			sigma, pf = m.pSignDleq(msg, m.pp.signers[0])
 		}
 	})
 
-	b.Run("Boldyreva2 pVerify", func(b *testing.B) {
+	b.Run("B2-pVerify", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			m.pVerifyDleq(roMsg, sigma, pk0Aff, pf)
@@ -102,7 +97,7 @@ func BenchmarkBoldyreva(b *testing.B) {
 	})
 }
 
-func BenchmarkAggBoldyreva(b *testing.B) {
+func BenchmarkBLSAgg(b *testing.B) {
 	testCases := []struct {
 		name string
 		n, t int
@@ -119,7 +114,7 @@ func BenchmarkAggBoldyreva(b *testing.B) {
 		crs := GenBLSCRS(tc.n)
 		m := NewBLS(tc.n, tc.t-1, crs)
 
-		// Picking the first t nodes as things are unweighted
+		// Picking the first t nodes
 		signers := make([]int, tc.t)
 		sigmas := make([]bls.G2Jac, tc.t)
 		for i := 0; i < tc.t; i++ {
@@ -131,28 +126,17 @@ func BenchmarkAggBoldyreva(b *testing.B) {
 		b.Run(tc.name+"-B1-agg", func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// sigmasAff := make([]bls.G2Affine, len(signers))
-				// for ii, sigma := range sigmas {
-				// 	sigmasAff[ii].FromJacobian(&sigma)
-				// }
 				sigma = m.verifyCombine(roMsg, signers, sigmas)
 			}
 		})
 
 		pfs := make([]Pf, tc.t)
 		for i := 0; i < b.N; i++ {
-			signers[i] = i
-			sigma, pf := m.pSignDleq(msg, m.pp.signers[i])
-			pfs[i] = pf
-			sigmas[i] = sigma
+			_, pfs[i] = m.pSignDleq(msg, m.pp.signers[i])
 		}
 		b.Run(tc.name+"-B2-agg", func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// sigmasAff := make([]bls.G2Affine, len(signers))
-				// for ii, sigma := range sigmas {
-				// 	sigmasAff[ii].FromJacobian(&sigma)
-				// }
 				sigma = m.verifyCombineDleq(roMsg, signers, sigmas, pfs)
 			}
 		})
