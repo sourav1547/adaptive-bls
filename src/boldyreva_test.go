@@ -131,7 +131,7 @@ func BenchmarkBLSAgg(b *testing.B) {
 		})
 
 		pfs := make([]Pf, tc.t)
-		for i := 0; i < b.N; i++ {
+		for i := 0; i < tc.t; i++ {
 			_, pfs[i] = m.pSignDleq(msg, m.pp.signers[i])
 		}
 		b.Run(tc.name+"-B2-agg", func(b *testing.B) {

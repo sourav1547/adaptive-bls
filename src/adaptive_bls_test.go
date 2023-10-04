@@ -104,18 +104,21 @@ func BenchmarkABLSAgg(b *testing.B) {
 		sigmas := make([]bls.G2Jac, tc.t)
 		pfs := make([]SigmaPf, tc.t)
 
-		for i := 0; i < b.N; i++ {
+		for i := 0; i < tc.t; i++ {
 			signers[i] = i
 			sigma, pf := m.pSign(msg, m.pp.signers[i])
 			pfs[i] = pf
 			sigmas[i] = sigma
 		}
 
+		var sigma bls.G2Jac
 		b.Run(tc.name+"-ABLS-agg", func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				m.verifyCombine(ro0Msg, ro1Msg, signers, sigmas, pfs)
+				sigma = m.verifyCombine(ro0Msg, ro1Msg, signers, sigmas, pfs)
+
 			}
 		})
+		assert.Equal(b, m.gverify(ro0Msg, sigma), true, "Adaptive BLS Threshold Signature")
 	}
 }
