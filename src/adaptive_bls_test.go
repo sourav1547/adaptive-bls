@@ -63,7 +63,7 @@ func BenchmarkABLS(b *testing.B) {
 
 	var sigma bls.G2Jac
 	var pf SigmaPf
-	b.Run("ABLS pSign", func(b *testing.B) {
+	b.Run("ABLS-pSign", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			sigma, pf = m.pSign(msg, m.pp.signers[0])
@@ -71,7 +71,7 @@ func BenchmarkABLS(b *testing.B) {
 	})
 
 	pk0Aff := *new(bls.G1Affine).FromJacobian(&m.pp.signers[0].pKey)
-	b.Run("ABLS pVerify", func(b *testing.B) {
+	b.Run("ABLS-pVerify", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			m.pVerify(ro0Msg, ro1Msg, sigma, pk0Aff, pf)
