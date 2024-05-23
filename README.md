@@ -30,13 +30,13 @@ The benchmakr outputs the following results:
 1. For Boldyreva-I
     - `B1-pSign` measures the partial signing time
     - `B1-pVerify` measures the partial signature verification time
-    - `[N]-B1-agg` measures the time to aggregate partial signatures from `N` signers
+    - `[T]-B1-agg` measures the time to aggregate partial signatures from `T` signers. Our benchmark outputs numbers for a threshold of 64, 256, and 1024.
 2. For Boldyreva-II
     - `B2-pSign` measures the partial signing time
     - `B2-pVerify` measures the partial signature verification time
-    - `[N]-B2-agg` measures the time to aggregate partial signatures from `N` signers
+    - `[T]-B2-agg` measures the time to aggregate partial signatures from `T` signers
 3. Common
-    - `[N]-verify` measures the cost to verify the final signatures with `N` signers. This is also applicable to our scheme.
+    - `[T]-verify` measures the cost to verify the final signatures with `T` signers. This is also applicable to our scheme.
 
 ### To benchmark adaptive BLS run
 ```go test -cpu 1 -benchmem -run=^$ -bench BenchmarkABLS```
@@ -45,4 +45,4 @@ The benchmakr outputs the following results:
 1. Our scheme 
     - `ABLS-pSign` measures the partial signing time
     - `ABLS-pVerify` measures the partial signature verification time
-    - `[N]-ABLS-agg` measures the time to aggregate partial signatures from `N` signers 
+    - `[T]-ABLS-agg` measures the time to aggregate partial signatures from `T` signers 
