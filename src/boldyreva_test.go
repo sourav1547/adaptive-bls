@@ -138,6 +138,7 @@ func BenchmarkBLSAgg(b *testing.B) {
 					sigmasAff[i].FromJacobian(&sigma)
 				}
 				sigma = m.combine(signers, sigmasAff)
+				m.gverify(roMsg, sigma)
 			}
 		})
 

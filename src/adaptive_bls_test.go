@@ -128,6 +128,7 @@ func BenchmarkABLSAgg(b *testing.B) {
 					sigmasAff[i].FromJacobian(&sigma)
 				}
 				sigma = m.combine(signers, sigmasAff)
+				assert.Equal(b, m.gverify(ro0Msg, sigma), true, "Adaptive BLS Threshold Signature")
 			}
 		})
 
