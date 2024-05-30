@@ -103,8 +103,8 @@ func BenchmarkBLSAgg(b *testing.B) {
 		n, t int
 	}{
 		{"64", 64, 64},
-		{"256", 256, 256},
-		{"1024", 1024, 1024},
+		// {"256", 256, 256},
+		// {"1024", 1024, 1024},
 	}
 
 	msg := []byte("hello world")
@@ -127,6 +127,17 @@ func BenchmarkBLSAgg(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				sigma = m.verifyCombine(roMsg, signers, sigmas)
+			}
+		})
+
+		b.Run(tc.name+"-B1-agg-no-verify", func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				sigmasAff := make([]bls.G2Affine, tc.t)
+				for i, sigma := range sigmas {
+					sigmasAff[i].FromJacobian(&sigma)
+				}
+				sigma = m.combine(signers, sigmasAff)
 			}
 		})
 

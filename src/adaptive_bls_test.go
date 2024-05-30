@@ -119,6 +119,18 @@ func BenchmarkABLSAgg(b *testing.B) {
 
 			}
 		})
+
+		b.Run(tc.name+"-ABLS-agg-no-verify", func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				sigmasAff := make([]bls.G2Affine, tc.t)
+				for i, sigma := range sigmas {
+					sigmasAff[i].FromJacobian(&sigma)
+				}
+				sigma = m.combine(signers, sigmasAff)
+			}
+		})
+
 		assert.Equal(b, m.gverify(ro0Msg, sigma), true, "Adaptive BLS Threshold Signature")
 	}
 }
